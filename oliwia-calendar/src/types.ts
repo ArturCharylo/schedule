@@ -5,4 +5,6 @@ export interface Lesson {
   end_time: string; // HH:mm
   subject: string;
   room: string;
+  type?: 'class' | 'event';
+  color?: string;
 }
