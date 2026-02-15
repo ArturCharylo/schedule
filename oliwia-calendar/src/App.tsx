@@ -9,7 +9,7 @@ import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 
 function App() {
   const [currentDay, setCurrentDay] = useState<number>(1);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Modal states
@@ -27,23 +27,22 @@ function App() {
     setCurrentDay(day);
   }, []);
 
-  // Fetch lessons
+  // Fetch all lessons once on mount
   useEffect(() => {
-    fetchLessons(currentDay);
-  }, [currentDay]);
+    fetchLessons();
+  }, []);
 
-  const fetchLessons = async (day: number) => {
+  const fetchLessons = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('lessons')
       .select('*')
-      .eq('day_of_week', day)
       .order('start_time', { ascending: true });
 
     if (error) {
       console.error('Error fetching lessons:', error);
     } else {
-      setLessons(data || []);
+      setAllLessons(data || []);
     }
     setLoading(false);
   };
@@ -72,7 +71,8 @@ function App() {
       if (error) console.error('Error creating lesson:', error);
     }
 
-    fetchLessons(currentDay);
+    // Refresh all lessons to ensure local state is in sync
+    fetchLessons();
     setEditingLesson(undefined);
   };
 
@@ -87,7 +87,7 @@ function App() {
     if (error) {
       console.error('Error deleting lesson:', error);
     } else {
-      fetchLessons(currentDay);
+      fetchLessons();
     }
     setIsDeleteModalOpen(false);
     setLessonToDelete(undefined);
@@ -107,6 +107,9 @@ function App() {
     setLessonToDelete(lesson);
     setIsDeleteModalOpen(true);
   };
+
+  // Filter lessons for current day
+  const lessonsForCurrentDay = allLessons.filter(l => l.day_of_week === currentDay);
 
   return (
     <div className="min-h-screen pb-20 pt-8 font-sans">
@@ -129,11 +132,11 @@ function App() {
         <DaySelector currentDay={currentDay} onSelectDay={setCurrentDay} />
 
         <div className="px-2">
-          {loading ? (
+          {loading && allLessons.length === 0 ? (
             <div className="flex justify-center items-center h-40">
               <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
             </div>
-          ) : lessons.length === 0 ? (
+          ) : lessonsForCurrentDay.length === 0 ? (
             <div className="text-center py-12 px-6">
               <div className="bg-white/30 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-lg">
                 <p className="text-gray-600 font-medium text-lg">No classes today! 🎉</p>
@@ -142,7 +145,7 @@ function App() {
             </div>
           ) : (
             <div className="space-y-4">
-              {lessons.map((lesson) => (
+              {lessonsForCurrentDay.map((lesson) => (
                 <LessonCard
                   key={lesson.id}
                   lesson={lesson}
