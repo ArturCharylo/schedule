@@ -1,6 +1,6 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "Oliwia Calendar",
+  "short_name": "Calendar",
   "icons": [
     {
       "src": "/https://oliwia-calendar.vercel.app/favicon.ico/web-app-manifest-192x192.png",
