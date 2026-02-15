@@ -3,12 +3,11 @@ import { Plus, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import type { Lesson } from './types';
 import { DaySelector } from './components/DaySelector';
-import { LessonCard } from './components/LessonCard';
+import { TimelineGrid } from './components/TimelineGrid';
 import { LessonModal } from './components/LessonModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 
-// 1. Zdefiniuj funkcję pobierania POZA komponentem.
-// To gwarantuje, że nie ma ona dostępu do stanu i nie powoduje pętli renderowania.
+// 1. Define fetch function OUTSIDE component
 async function fetchAllLessonsFromDb() {
   const { data, error } = await supabase
     .from('lessons')
@@ -23,15 +22,14 @@ async function fetchAllLessonsFromDb() {
 }
 
 function App() {
-  // Lazy initialization dla dnia tygodnia (optymalizacja)
+  // Lazy initialization for day of week
   const [currentDay, setCurrentDay] = useState<number>(() => {
     const today = new Date().getDay();
-    // Sunday=0, Monday=1... Jeśli weekend, ustaw poniedziałek.
+    // Sunday=0, Monday=1... If weekend, set to Monday.
     return (today === 0 || today === 6) ? 1 : today;
   });
 
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
-  // Startujemy z loading: true, żeby nie ustawiać go w useEffect
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -40,7 +38,6 @@ function App() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | undefined>(undefined);
 
-  // 2. useEffect służy teraz TYLKO do pierwszego załadowania
   useEffect(() => {
     let mounted = true;
 
@@ -54,9 +51,7 @@ function App() {
     return () => { mounted = false; };
   }, []);
 
-  // 3. Funkcja pomocnicza do odświeżania danych (używana przy Zapisz/Usuń)
   const refreshLessons = async () => {
-    // Opcjonalnie: setLoading(true) jeśli chcesz pokazać spinner przy odświeżaniu
     const data = await fetchAllLessonsFromDb();
     setAllLessons(data);
   };
@@ -71,7 +66,9 @@ function App() {
           room: lessonData.room,
           start_time: lessonData.start_time,
           end_time: lessonData.end_time,
-          day_of_week: lessonData.day_of_week
+          day_of_week: lessonData.day_of_week,
+          type: lessonData.type,
+          color: lessonData.color,
         })
         .eq('id', lessonData.id);
 
@@ -85,7 +82,6 @@ function App() {
       if (error) console.error('Error creating lesson:', error);
     }
 
-    // Odśwież dane po zapisie (Silent Refresh)
     await refreshLessons();
     setEditingLesson(undefined);
   };
@@ -118,7 +114,15 @@ function App() {
   };
 
   const openDeleteModal = (lesson: Lesson) => {
+    // When called from Timeline, the modal might be open.
+    // But usually we open delete confirmation from the edit modal or directly.
+    // In my design, I pass onDelete to LessonModal.
+    // So LessonModal calls this.
     setLessonToDelete(lesson);
+    // We should close the edit modal if it's open, but let's just open the confirm modal.
+    // Actually, LessonModal closes itself before calling onDelete if I implemented it that way?
+    // In LessonModal: onClick={() => { onDelete(); onClose(); }}
+    // So LessonModal closes, then openDeleteModal is called.
     setIsDeleteModalOpen(true);
   };
 
@@ -126,11 +130,11 @@ function App() {
   const lessonsForCurrentDay = allLessons.filter(l => l.day_of_week === currentDay);
 
   return (
-    <div className="min-h-screen pb-20 pt-8 font-sans">
+    <div className="min-h-screen pb-20 pt-8 font-sans overflow-hidden">
       <div className="blob-bg" />
 
-      <div className="max-w-md mx-auto">
-        <header className="px-6 mb-6 flex justify-between items-center">
+      <div className="max-w-md mx-auto h-full flex flex-col">
+        <header className="px-6 mb-6 flex justify-between items-center shrink-0">
           <div>
             <h1 className="text-3xl font-bold text-gray-900/80">Schedule</h1>
             <p className="text-gray-500 font-medium">Have a great day, Oliwia! ❤️</p>
@@ -143,31 +147,20 @@ function App() {
           </button>
         </header>
 
-        <DaySelector currentDay={currentDay} onSelectDay={setCurrentDay} />
+        <div className="shrink-0 mb-4">
+          <DaySelector currentDay={currentDay} onSelectDay={setCurrentDay} />
+        </div>
 
-        <div className="px-2">
+        <div className="px-2 flex-grow relative pb-4">
           {loading && allLessons.length === 0 ? (
-            <div className="flex justify-center items-center h-40">
+            <div className="flex justify-center items-center h-60">
               <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
             </div>
-          ) : lessonsForCurrentDay.length === 0 ? (
-            <div className="text-center py-12 px-6">
-              <div className="bg-white/30 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-lg">
-                <p className="text-gray-600 font-medium text-lg">No classes today! 🎉</p>
-                <p className="text-gray-500 text-sm mt-2">Enjoy your free time.</p>
-              </div>
-            </div>
           ) : (
-            <div className="space-y-4">
-              {lessonsForCurrentDay.map((lesson) => (
-                <LessonCard
-                  key={lesson.id}
-                  lesson={lesson}
-                  onEdit={openEditModal}
-                  onDelete={openDeleteModal}
-                />
-              ))}
-            </div>
+            <TimelineGrid
+              lessons={lessonsForCurrentDay}
+              onEdit={openEditModal}
+            />
           )}
         </div>
       </div>
@@ -176,6 +169,7 @@ function App() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveLesson}
+        onDelete={editingLesson ? () => openDeleteModal(editingLesson) : undefined}
         initialData={editingLesson}
         day={currentDay}
       />
