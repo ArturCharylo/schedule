@@ -7,10 +7,32 @@ import { LessonCard } from './components/LessonCard';
 import { LessonModal } from './components/LessonModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 
+// 1. Zdefiniuj funkcję pobierania POZA komponentem.
+// To gwarantuje, że nie ma ona dostępu do stanu i nie powoduje pętli renderowania.
+async function fetchAllLessonsFromDb() {
+  const { data, error } = await supabase
+    .from('lessons')
+    .select('*')
+    .order('start_time', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching lessons:', error);
+    return [];
+  }
+  return data || [];
+}
+
 function App() {
-  const [currentDay, setCurrentDay] = useState<number>(1);
+  // Lazy initialization dla dnia tygodnia (optymalizacja)
+  const [currentDay, setCurrentDay] = useState<number>(() => {
+    const today = new Date().getDay();
+    // Sunday=0, Monday=1... Jeśli weekend, ustaw poniedziałek.
+    return (today === 0 || today === 6) ? 1 : today;
+  });
+
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Startujemy z loading: true, żeby nie ustawiać go w useEffect
+  const [loading, setLoading] = useState(true);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,33 +40,25 @@ function App() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | undefined>(undefined);
 
-  // Set current day on mount
+  // 2. useEffect służy teraz TYLKO do pierwszego załadowania
   useEffect(() => {
-    const today = new Date().getDay();
-    // Sunday=0, Monday=1, ..., Saturday=6
-    // If weekend (0 or 6), default to Monday (1). Else use today.
-    const day = (today === 0 || today === 6) ? 1 : today;
-    setCurrentDay(day);
+    let mounted = true;
+
+    fetchAllLessonsFromDb().then((data) => {
+      if (mounted) {
+        setAllLessons(data);
+        setLoading(false);
+      }
+    });
+
+    return () => { mounted = false; };
   }, []);
 
-  // Fetch all lessons once on mount
-  useEffect(() => {
-    fetchLessons();
-  }, []);
-
-  const fetchLessons = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('lessons')
-      .select('*')
-      .order('start_time', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching lessons:', error);
-    } else {
-      setAllLessons(data || []);
-    }
-    setLoading(false);
+  // 3. Funkcja pomocnicza do odświeżania danych (używana przy Zapisz/Usuń)
+  const refreshLessons = async () => {
+    // Opcjonalnie: setLoading(true) jeśli chcesz pokazać spinner przy odświeżaniu
+    const data = await fetchAllLessonsFromDb();
+    setAllLessons(data);
   };
 
   const handleSaveLesson = async (lessonData: Omit<Lesson, 'id'> | Lesson) => {
@@ -71,8 +85,8 @@ function App() {
       if (error) console.error('Error creating lesson:', error);
     }
 
-    // Refresh all lessons to ensure local state is in sync
-    fetchLessons();
+    // Odśwież dane po zapisie (Silent Refresh)
+    await refreshLessons();
     setEditingLesson(undefined);
   };
 
@@ -87,7 +101,7 @@ function App() {
     if (error) {
       console.error('Error deleting lesson:', error);
     } else {
-      fetchLessons();
+      await refreshLessons();
     }
     setIsDeleteModalOpen(false);
     setLessonToDelete(undefined);
