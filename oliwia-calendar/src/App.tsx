@@ -6,6 +6,7 @@ import { DaySelector } from './components/DaySelector';
 import { TimelineGrid } from './components/TimelineGrid';
 import { LessonModal } from './components/LessonModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { NotificationManager } from './components/NotificationManager';
 
 // 1. Define fetch function OUTSIDE component
 async function fetchAllLessonsFromDb() {
@@ -139,12 +140,15 @@ function App() {
             <h1 className="text-3xl font-bold text-gray-900/80">Schedule</h1>
             <p className="text-gray-500 font-medium">Have a great day, Oliwia! ❤️</p>
           </div>
-          <button
-            onClick={openAddModal}
-            className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
-          >
-            <Plus className="w-6 h-6 text-gray-800" />
-          </button>
+          <div className="flex gap-2">
+            <NotificationManager />
+            <button
+              onClick={openAddModal}
+              className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
+            >
+              <Plus className="w-6 h-6 text-gray-800" />
+            </button>
+          </div>
         </header>
 
         <div className="shrink-0 mb-4">

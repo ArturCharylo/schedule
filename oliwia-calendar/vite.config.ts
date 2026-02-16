@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon.svg'],
       manifest: {
@@ -38,7 +41,8 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: true // enable PWA features during development for easier testing
+        enabled: true,
+        type: 'module',
       }
     })
   ]
