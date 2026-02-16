@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import webpush from 'https://esm.sh/web-push@3.6.7';
+import webpush from 'npm:web-push@3.6.7';
 
 // Types
 interface Lesson {
@@ -22,7 +22,7 @@ Deno.serve(async () => {
     const supabaseServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')!;
     const vapidPublicKey = Deno.env.get('VITE_VAPID_PUBLIC_KEY')!;
     const vapidPrivateKey = Deno.env.get('VITE_VAPID_PRIVATE_KEY')!;
-    const vapidSubject = 'artur.cha@outlook.com';
+    const vapidSubject = 'mailto:artur.cha@outlook.com';
 
     if (!supabaseUrl || !supabaseServiceRoleKey || !vapidPublicKey || !vapidPrivateKey) {
       throw new Error('Missing environment variables');

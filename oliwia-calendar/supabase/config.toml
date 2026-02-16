@@ -2,7 +2,3 @@ project_id = "oliwia-calendar"
 
 [functions.check-notifications]
 verify_jwt = false
-
-[[edge_runtime.cron_jobs]]
-function = "check-notifications"
-schedule = "*/5 * * * *"
