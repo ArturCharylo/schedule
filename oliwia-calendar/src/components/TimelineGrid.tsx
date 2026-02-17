@@ -21,7 +21,7 @@ export function TimelineGrid({ items, onEdit }: TimelineGridProps) {
 
   return (
     <div className="relative bg-white/60 backdrop-blur-2xl rounded-[32px] shadow-2xl overflow-hidden border border-white/60">
-      <div className="h-full overflow-y-auto no-scrollbar scroll-smooth" style={{ height: 'calc(100vh - 220px)', minHeight: '400px' }}>
+      <div className="h-full overflow-y-auto no-scrollbar scroll-smooth pt-7" style={{ height: 'calc(100vh - 220px)', minHeight: '400px' }}>
         <div className="relative w-full" style={{ height: `${totalHeight}px` }}>
 
           {/* Hour Markers & Grid Lines */}
