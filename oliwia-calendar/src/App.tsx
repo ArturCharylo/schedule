@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, CalendarRange } from 'lucide-react'; // Added CalendarRange icon
 import { supabase } from './lib/supabase';
 import type { ScheduleItem } from './types';
 import { DaySelector } from './components/DaySelector';
@@ -9,6 +9,7 @@ import type { LessonFormData } from './components/LessonModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { NotificationManager } from './components/NotificationManager';
 import { useSchedule } from './hooks/useSchedule';
+import { HolidayModal } from './components/HolidayModal'; // Import new component
 
 function App() {
   // 1. Current Date State
@@ -19,6 +20,7 @@ function App() {
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false); // New State
   const [editingItem, setEditingItem] = useState<ScheduleItem | undefined>(undefined);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ScheduleItem | undefined>(undefined);
@@ -27,8 +29,6 @@ function App() {
   const handleSaveItem = async (data: LessonFormData, isRecurring: boolean) => {
     // Data contains: subject, room, start_time, end_time, type, color, date (if provided), id (if edit)
 
-    // Prepare common fields for both 'lessons' and 'events' tables
-    // (We assume the database schema has been updated to use 'subject' and 'type' in both tables)
     const commonFields = {
         subject: data.subject,
         room: data.room,
@@ -61,9 +61,6 @@ function App() {
 
         } else {
              // 3. Conversion (Type changed: Recurring <-> One-time)
-             // CRITICAL CHANGE: We insert the NEW item first, check for success, and only THEN delete the OLD item.
-             // This prevents data loss if the insertion fails.
-
              if (wasRecurring) {
                  // Converting Lesson to Event
                  const { error: insertError } = await supabase
@@ -155,6 +152,16 @@ function App() {
           </div>
           <div className="flex gap-2">
             <NotificationManager />
+            
+            {/* New Holiday Button */}
+            <button
+              onClick={() => setIsHolidayModalOpen(true)}
+              className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
+              title="Add Days Off"
+            >
+              <CalendarRange className="w-6 h-6 text-purple-600" />
+            </button>
+
             <button
               onClick={openAddModal}
               className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
@@ -196,6 +203,12 @@ function App() {
         onDelete={editingItem ? () => openDeleteModal(editingItem) : undefined}
         initialData={editingItem}
         currentDate={currentDate}
+      />
+
+      <HolidayModal 
+        isOpen={isHolidayModalOpen}
+        onClose={() => setIsHolidayModalOpen(false)}
+        onSave={refreshSchedule}
       />
 
       <ConfirmDeleteModal
