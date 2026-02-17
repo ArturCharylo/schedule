@@ -1,14 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import webpush from 'npm:web-push@3.6.7';
 
-// Types
-interface Lesson {
+// --- Types ---
+interface ScheduleItem {
   id: string;
-  day_of_week: number;
   start_time: string;
   subject: string;
   room: string;
   notification_sent: boolean;
+  type: 'lesson' | 'event'; // Helper to distinguish source
 }
 
 interface Subscription {
@@ -18,6 +18,7 @@ interface Subscription {
 
 Deno.serve(async () => {
   try {
+    // 1. Setup & Config
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')!;
     const vapidPublicKey = Deno.env.get('VITE_VAPID_PUBLIC_KEY')!;
@@ -30,123 +31,164 @@ Deno.serve(async () => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    webpush.setVapidDetails(
-      vapidSubject,
-      vapidPublicKey,
-      vapidPrivateKey
-    );
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
-    // 1. Get current time in Poland
-    const formatter = new Intl.DateTimeFormat('en-GB', {
+    // 2. Get current time (Poland)
+    const formatter = new Intl.DateTimeFormat('en-CA', { // en-CA gives YYYY-MM-DD format
       timeZone: 'Europe/Warsaw',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      weekday: 'long',
       hour12: false
     });
 
-    const now = new Date();
-    const parts = formatter.formatToParts(now);
-    const hourStr = parts.find(p => p.type === 'hour')?.value || '00';
-    const minuteStr = parts.find(p => p.type === 'minute')?.value || '00';
-    const dayName = parts.find(p => p.type === 'weekday')?.value;
+    // Format parts to get clean values
+    const parts = formatter.formatToParts(new Date());
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '00';
+    
+    const year = getPart('year');
+    const month = getPart('month');
+    const day = getPart('day');
+    const hourStr = getPart('hour');
+    const minuteStr = getPart('minute');
 
-    const daysMap: Record<string, number> = {
-      'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5,
-      'Saturday': 6, 'Sunday': 7
-    };
-
-    const currentDay = daysMap[dayName || ''] || 0;
+    const todayDateString = `${year}-${month}-${day}`; // YYYY-MM-DD
     const currentHour = parseInt(hourStr, 10);
     const currentMinute = parseInt(minuteStr, 10);
     const currentTotalMinutes = currentHour * 60 + currentMinute;
+    
+    // Calculate Day of Week (0-6, where 0 is Sunday in JS, but usually 1-7 in our DB?)
+    // Let's verify standard JS getDay(): 0=Sun, 1=Mon... 
+    // Your App.tsx uses getDay(), so we use the same logic.
+    const now = new Date();
+    // Trick: create date object from the Polish string components to get correct weekday
+    // (creating "new Date()" directly uses server UTC time, which might be different day)
+    const polishDateObj = new Date(`${todayDateString}T${hourStr}:${minuteStr}:00`);
+    const currentDayOfWeek = polishDateObj.getDay(); // 0=Sun, 1=Mon...
 
-    console.log(`Current time (Warsaw): ${currentHour}:${currentMinute}, Day: ${currentDay}`);
+    console.log(`Time (PL): ${todayDateString} ${currentHour}:${currentMinute}, DayOfWeek: ${currentDayOfWeek}`);
 
-    // 2. Fetch today's lessons that haven't been notified
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('lessons')
-      .select('*')
-      .eq('day_of_week', currentDay)
-      .eq('notification_sent', false);
+    // 3. Check for Holiday
+    const { data: holidays } = await supabase
+      .from('holidays')
+      .select('name')
+      .eq('date', todayDateString);
+    
+    const isHoliday = holidays && holidays.length > 0;
+    if (isHoliday) {
+        console.log(`Today is a holiday: ${holidays[0].name}. Skipping lessons.`);
+    }
 
-    if (lessonsError) throw lessonsError;
+    // 4. Fetch Items (Events + Lessons)
+    let itemsToCheck: ScheduleItem[] = [];
 
-    const lessonsToNotify: Lesson[] = [];
+    // A. Fetch One-time Events (Always check these, even on holidays - e.g. Doctor)
+    const { data: events } = await supabase
+        .from('events')
+        .select('id, start_time, subject, room, notification_sent')
+        .eq('date', todayDateString)
+        .eq('notification_sent', false);
 
-    for (const lesson of (lessons || [])) {
-      const [h, m] = lesson.start_time.split(':').map(Number);
-      const lessonTotalMinutes = h * 60 + m;
+    if (events) {
+        itemsToCheck = itemsToCheck.concat(events.map(e => ({ ...e, type: 'event' })));
+    }
 
-      const diff = lessonTotalMinutes - currentTotalMinutes;
+    // B. Fetch Lessons (Only if NOT holiday)
+    if (!isHoliday) {
+        const { data: lessons } = await supabase
+            .from('lessons')
+            .select('id, start_time, subject, room, notification_sent')
+            .eq('day_of_week', currentDayOfWeek)
+            .eq('notification_sent', false);
+        
+        if (lessons) {
+            itemsToCheck = itemsToCheck.concat(lessons.map(l => ({ ...l, type: 'lesson' })));
+        }
+    }
 
-      // Check if within 15-20 minutes
+    // 5. Filter items within 15-20 min window
+    const itemsToNotify: ScheduleItem[] = [];
+
+    for (const item of itemsToCheck) {
+      const [h, m] = item.start_time.split(':').map(Number);
+      const itemTotalMinutes = h * 60 + m;
+      const diff = itemTotalMinutes - currentTotalMinutes;
+
+      // Check window
       if (diff >= 15 && diff <= 20) {
-        lessonsToNotify.push(lesson);
+        itemsToNotify.push(item);
       }
     }
 
-    if (lessonsToNotify.length === 0) {
-      return new Response(JSON.stringify({ message: 'No lessons to notify' }), {
+    // 6. Maintenance: Reset lessons for OTHER days
+    // If today is Tuesday, reset Monday's lessons to notification_sent=false so they work next week.
+    // We do this asynchronously without waiting to speed up response.
+    supabase
+        .from('lessons')
+        .update({ notification_sent: false })
+        .neq('day_of_week', currentDayOfWeek)
+        .eq('notification_sent', true)
+        .then(({ error }) => {
+            if (error) console.error('Error resetting old lessons:', error);
+            else console.log('Old lessons flags reset successfully.');
+        });
+
+
+    if (itemsToNotify.length === 0) {
+      return new Response(JSON.stringify({ message: 'No items to notify' }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // 3. Fetch subscriptions
-    const { data: subscriptions, error: subsError } = await supabase
-      .from('subscriptions')
-      .select('*');
-
-    if (subsError) throw subsError;
-
-    // 4. Send notifications
+    // 7. Send Notifications
+    const { data: subscriptions } = await supabase.from('subscriptions').select('*');
     const results = [];
+    const appUrl = 'https://oliwia-calendar.vercel.app'; // Your Vercel URL
 
-    for (const lesson of lessonsToNotify) {
+    for (const item of itemsToNotify) {
       const payload = JSON.stringify({
         title: "Za 15 minut!",
-        body: `${lesson.subject} w sali ${lesson.room}`,
-        icon: "/web-app-manifest-192x192.png"
+        body: `${item.subject} (${item.room || 'online'})`, // Handle empty room
+        icon: `${appUrl}/web-app-manifest-192x192.png`,
+        badge: `${appUrl}/web-app-manifest-192x192.png`
       });
 
+      // Send to all subscribers
       const promises = (subscriptions || []).map(async (sub: Subscription) => {
         try {
           await webpush.sendNotification(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             sub.subscription_data as any,
             payload
           );
-          return { status: 'fulfilled', subId: sub.id };
-        } catch (error: unknown) {
-          const webPushError = error as { statusCode?: number };
-          if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
-             // Delete expired subscription
+          return { status: 'fulfilled' };
+        } catch (error: any) {
+          if (error.statusCode === 410 || error.statusCode === 404) {
              await supabase.from('subscriptions').delete().eq('id', sub.id);
-             return { status: 'deleted', subId: sub.id };
           }
-          console.error('Error sending notification:', error);
-          return { status: 'rejected', subId: sub.id, error };
+          return { status: 'rejected' };
         }
       });
 
       await Promise.all(promises);
 
-      // Mark lesson as notified
+      // 8. Mark as Sent in DB
+      const table = item.type === 'lesson' ? 'lessons' : 'events';
       await supabase
-        .from('lessons')
+        .from(table)
         .update({ notification_sent: true })
-        .eq('id', lesson.id);
+        .eq('id', item.id);
 
-      results.push({ lesson: lesson.subject, sent: true });
+      results.push({ subject: item.subject, sent: true });
     }
 
     return new Response(JSON.stringify({ results }), {
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: message }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

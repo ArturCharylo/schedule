@@ -18,7 +18,8 @@ export function useSchedule(currentDate: Date): UseScheduleResult {
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
     const dateStr = format(currentDate, 'yyyy-MM-dd');
-    const dayOfWeek = currentDate.getDay(); // 0-6
+    const rawDay = currentDate.getDay();
+    const dayOfWeek = rawDay === 0 ? 7 : rawDay;
 
     try {
       // 1. Fetch Holidays
