@@ -66,7 +66,8 @@ Deno.serve(async () => {
     // Trick: create date object from the Polish string components to get correct weekday
     // (creating "new Date()" directly uses server UTC time, which might be different day)
     const polishDateObj = new Date(`${todayDateString}T${hourStr}:${minuteStr}:00`);
-    const currentDayOfWeek = polishDateObj.getDay(); // 0=Sun, 1=Mon...
+    const rawDay = polishDateObj.getDay();
+    const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
 
     console.log(`Time (PL): ${todayDateString} ${currentHour}:${currentMinute}, DayOfWeek: ${currentDayOfWeek}`);
 
