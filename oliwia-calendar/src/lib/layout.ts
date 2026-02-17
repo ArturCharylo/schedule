@@ -1,17 +1,17 @@
-import type { Lesson } from '../types';
+import type { ScheduleItem } from '../types';
 
-export interface LayoutEvent extends Lesson {
+export type LayoutEvent = ScheduleItem & {
   top: number;
   height: number;
   left: number;
   width: number;
-}
+};
 
 const START_HOUR = 7;
 
-export function calculateLayout(lessons: Lesson[]): LayoutEvent[] {
+export function calculateLayout(items: ScheduleItem[]): LayoutEvent[] {
   // 1. Sort by start time, then end time (longer first)
-  const sortedLessons = [...lessons].sort((a, b) => {
+  const sortedItems = [...items].sort((a, b) => {
     if (a.start_time !== b.start_time) {
       return a.start_time.localeCompare(b.start_time);
     }
@@ -27,16 +27,16 @@ export function calculateLayout(lessons: Lesson[]): LayoutEvent[] {
   };
 
   // 2. Calculate top and height (1 minute = 1px height unit, scaling handled in CSS)
-  sortedLessons.forEach((lesson) => {
-    const startMinutes = getMinutes(lesson.start_time);
-    const endMinutes = getMinutes(lesson.end_time);
+  sortedItems.forEach((item) => {
+    const startMinutes = getMinutes(item.start_time);
+    const endMinutes = getMinutes(item.end_time);
     const startOfDay = START_HOUR * 60;
 
     const top = Math.max(0, startMinutes - startOfDay);
     const height = Math.max(30, endMinutes - startMinutes); // minimum 30 mins
 
     events.push({
-      ...lesson,
+      ...item,
       top,
       height,
       left: 0,
