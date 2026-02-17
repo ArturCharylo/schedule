@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { supabase } from '../lib/supabase';
-import type { Lesson, CalendarEvent, Holiday, ScheduleItem } from '../types';
+import { fetchLessons, fetchEvents, fetchHolidays } from '../lib/api';
+import type { ScheduleItem, Holiday, Lesson, CalendarEvent } from '../types';
 
 interface UseScheduleResult {
   scheduleItems: ScheduleItem[];
@@ -11,73 +12,61 @@ interface UseScheduleResult {
 }
 
 export function useSchedule(currentDate: Date): UseScheduleResult {
-  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([]);
-  const [holiday, setHoliday] = useState<Holiday | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const dateStr = format(currentDate, 'yyyy-MM-dd');
+  const rawDay = currentDate.getDay();
+  const dayOfWeek = rawDay === 0 ? 7 : rawDay;
 
-  const fetchSchedule = useCallback(async () => {
-    setLoading(true);
-    const dateStr = format(currentDate, 'yyyy-MM-dd');
-    const rawDay = currentDate.getDay();
-    const dayOfWeek = rawDay === 0 ? 7 : rawDay;
+  // Fetch all data
+  const { data: allLessons = [], isLoading: loadingLessons } = useQuery({
+    queryKey: ['lessons'],
+    queryFn: fetchLessons,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-    try {
-      // 1. Fetch Holidays
-      const { data: holidaysData, error: holidaysError } = await supabase
-        .from('holidays')
-        .select('*')
-        .eq('date', dateStr);
+  const { data: allEvents = [], isLoading: loadingEvents } = useQuery({
+    queryKey: ['events'],
+    queryFn: fetchEvents,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-      if (holidaysError) throw holidaysError;
+  const { data: allHolidays = [], isLoading: loadingHolidays } = useQuery({
+    queryKey: ['holidays'],
+    queryFn: fetchHolidays,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-      const currentHoliday = holidaysData && holidaysData.length > 0 ? holidaysData[0] : null;
-      setHoliday(currentHoliday);
+  // Filter and compute derived state
+  const { scheduleItems, holiday } = useMemo(() => {
+    // 1. Find Holiday for today
+    const currentHoliday = allHolidays.find(h => h.date === dateStr) || null;
 
-      // 2. Fetch Events (One-time)
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('events')
-        .select('*')
-        .eq('date', dateStr);
+    // 2. Filter Events (One-time) for today
+    const todaysEvents: CalendarEvent[] = allEvents.filter(e => e.date === dateStr);
 
-      if (eventsError) throw eventsError;
-
-      const events: CalendarEvent[] = eventsData || [];
-
-      // Logic:
-      // IF holiday has an entry for today: Return ONLY events (One-time). Do NOT show lessons.
-      // ELSE: Return lessons + events merged together.
-
-      let lessons: Lesson[] = [];
-      if (!currentHoliday) {
-        // Fetch Lessons (Recurring) only if not a holiday
-        // Map dayOfWeek: 0(Sun)..6(Sat). Lessons table uses 1(Mon)..5(Fri).
-        const { data: lessonsData, error: lessonsError } = await supabase
-          .from('lessons')
-          .select('*')
-          .eq('day_of_week', dayOfWeek);
-
-        if (lessonsError) throw lessonsError;
-        lessons = lessonsData || [];
-      }
-
-      // Merge and Sort
-      const allItems: ScheduleItem[] = [...lessons, ...events].sort((a, b) => {
-        return a.start_time.localeCompare(b.start_time);
-      });
-
-      setScheduleItems(allItems);
-
-    } catch (error) {
-      console.error('Error fetching schedule:', error);
-      setScheduleItems([]);
-    } finally {
-      setLoading(false);
+    let lessons: Lesson[] = [];
+    if (!currentHoliday) {
+      // 3. Filter Lessons (Recurring) for today (if not holiday)
+      lessons = allLessons.filter(l => l.day_of_week === dayOfWeek);
     }
-  }, [currentDate]);
 
-  useEffect(() => {
-    fetchSchedule();
-  }, [fetchSchedule]);
+    // Merge and Sort
+    const allItems: ScheduleItem[] = [...lessons, ...todaysEvents].sort((a, b) => {
+      return a.start_time.localeCompare(b.start_time);
+    });
 
-  return { scheduleItems, holiday, loading, refreshSchedule: fetchSchedule };
+    return { scheduleItems: allItems, holiday: currentHoliday };
+  }, [dateStr, dayOfWeek, allHolidays, allEvents, allLessons]);
+
+  const loading = loadingLessons || loadingEvents || loadingHolidays;
+
+  const refreshSchedule = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['lessons'] }),
+      queryClient.invalidateQueries({ queryKey: ['events'] }),
+      queryClient.invalidateQueries({ queryKey: ['holidays'] }),
+    ]);
+  }, [queryClient]);
+
+  return { scheduleItems, holiday, loading, refreshSchedule };
 }
