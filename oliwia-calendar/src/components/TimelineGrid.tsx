@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
-import type { Lesson } from '../types';
+import type { ScheduleItem } from '../types';
 import { calculateLayout } from '../lib/layout';
 import { TimelineEvent } from './TimelineEvent';
 
 interface TimelineGridProps {
-  lessons: Lesson[];
-  onEdit: (lesson: Lesson) => void;
+  items: ScheduleItem[];
+  onEdit: (item: ScheduleItem) => void;
 }
 
 const START_HOUR = 7;
 const END_HOUR = 22;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
-export function TimelineGrid({ lessons, onEdit }: TimelineGridProps) {
+export function TimelineGrid({ items, onEdit }: TimelineGridProps) {
   // Memoize layout calculation to avoid re-calculating on every render
-  const layoutEvents = useMemo(() => calculateLayout(lessons), [lessons]);
+  const layoutEvents = useMemo(() => calculateLayout(items), [items]);
 
   // Total height in pixels (60px per hour) plus some padding at bottom
   const totalHeight = (END_HOUR - START_HOUR + 1) * 60 + 20;

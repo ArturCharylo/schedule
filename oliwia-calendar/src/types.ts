@@ -8,3 +8,22 @@ export interface Lesson {
   type?: 'class' | 'event';
   color?: string;
 }
+
+export interface CalendarEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  start_time: string;
+  end_time: string;
+  subject: string;
+  room: string;
+  type?: 'class' | 'event';
+  color?: string;
+}
+
+export interface Holiday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+}
+
+export type ScheduleItem = Lesson | CalendarEvent;
