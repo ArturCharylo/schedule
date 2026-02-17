@@ -25,8 +25,10 @@ function App() {
 
   // 3. Handle Save (Create/Update)
   const handleSaveItem = async (data: LessonFormData, isRecurring: boolean) => {
-    // data contains: subject, room, start_time, end_time, type, color, date (if provided), id (if edit)
+    // Data contains: subject, room, start_time, end_time, type, color, date (if provided), id (if edit)
 
+    // Prepare common fields for both 'lessons' and 'events' tables
+    // (We assume the database schema has been updated to use 'subject' and 'type' in both tables)
     const commonFields = {
         subject: data.subject,
         room: data.room,
@@ -37,40 +39,60 @@ function App() {
     };
 
     if (data.id && editingItem) {
-        // Update existing
+        // --- EDIT EXISTING ITEM ---
         const wasRecurring = !('date' in editingItem);
         const wasOneTime = 'date' in editingItem;
 
         if (wasRecurring && isRecurring) {
-             // Update Lesson
+             // 1. Lesson -> Lesson (Update)
              const { error } = await supabase
                 .from('lessons')
                 .update({ ...commonFields, day_of_week: currentDate.getDay() })
                 .eq('id', data.id);
              if (error) console.error('Error updating lesson:', error);
+
         } else if (wasOneTime && !isRecurring) {
-             // Update Event
+             // 2. Event -> Event (Update)
              const { error } = await supabase
                 .from('events')
                 .update({ ...commonFields, date: data.date })
                 .eq('id', data.id);
              if (error) console.error('Error updating event:', error);
+
         } else {
-             // Type changed (Recurring <-> One-time)
-             // Delete old, create new.
+             // 3. Conversion (Type changed: Recurring <-> One-time)
+             // CRITICAL CHANGE: We insert the NEW item first, check for success, and only THEN delete the OLD item.
+             // This prevents data loss if the insertion fails.
+
              if (wasRecurring) {
-                 await supabase.from('lessons').delete().eq('id', data.id);
-                 const { error } = await supabase.from('events').insert([{ ...commonFields, date: data.date }]);
-                 if (error) console.error('Error creating event (converted):', error);
+                 // Converting Lesson to Event
+                 const { error: insertError } = await supabase
+                    .from('events')
+                    .insert([{ ...commonFields, date: data.date }]);
+                 
+                 if (!insertError) {
+                    await supabase.from('lessons').delete().eq('id', data.id);
+                 } else {
+                    console.error('Error converting lesson to event:', insertError);
+                    alert("Failed to convert lesson to event. No changes made.");
+                 }
              } else {
-                 await supabase.from('events').delete().eq('id', data.id);
-                 const { error } = await supabase.from('lessons').insert([{ ...commonFields, day_of_week: currentDate.getDay() }]);
-                 if (error) console.error('Error creating lesson (converted):', error);
+                 // Converting Event to Lesson
+                 const { error: insertError } = await supabase
+                    .from('lessons')
+                    .insert([{ ...commonFields, day_of_week: currentDate.getDay() }]);
+                 
+                 if (!insertError) {
+                    await supabase.from('events').delete().eq('id', data.id);
+                 } else {
+                     console.error('Error converting event to lesson:', insertError);
+                     alert("Failed to convert event to lesson. No changes made.");
+                 }
              }
         }
 
     } else {
-        // Create New
+        // --- CREATE NEW ITEM ---
         if (isRecurring) {
              const { error } = await supabase
                 .from('lessons')
@@ -92,11 +114,11 @@ function App() {
     if (!itemToDelete) return;
 
     if ('date' in itemToDelete) {
-        // Event
+        // Delete Event
         const { error } = await supabase.from('events').delete().eq('id', itemToDelete.id);
         if (error) console.error('Error deleting event:', error);
     } else {
-        // Lesson
+        // Delete Lesson
         const { error } = await supabase.from('lessons').delete().eq('id', itemToDelete.id);
         if (error) console.error('Error deleting lesson:', error);
     }
