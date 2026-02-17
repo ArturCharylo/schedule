@@ -1,134 +1,125 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import type { Lesson } from './types';
+import type { ScheduleItem } from './types';
 import { DaySelector } from './components/DaySelector';
 import { TimelineGrid } from './components/TimelineGrid';
 import { LessonModal } from './components/LessonModal';
+import type { LessonFormData } from './components/LessonModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { NotificationManager } from './components/NotificationManager';
-
-// 1. Define fetch function OUTSIDE component
-async function fetchAllLessonsFromDb() {
-  const { data, error } = await supabase
-    .from('lessons')
-    .select('*')
-    .order('start_time', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching lessons:', error);
-    return [];
-  }
-  return data || [];
-}
+import { useSchedule } from './hooks/useSchedule';
 
 function App() {
-  // Lazy initialization for day of week
-  const [currentDay, setCurrentDay] = useState<number>(() => {
-    const today = new Date().getDay();
-    // Sunday=0, Monday=1... If weekend, set to Monday.
-    return (today === 0 || today === 6) ? 1 : today;
-  });
+  // 1. Current Date State
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 2. Fetch Schedule Data
+  const { scheduleItems, holiday, loading, refreshSchedule } = useSchedule(currentDate);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<Lesson | undefined>(undefined);
+  const [editingItem, setEditingItem] = useState<ScheduleItem | undefined>(undefined);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [lessonToDelete, setLessonToDelete] = useState<Lesson | undefined>(undefined);
+  const [itemToDelete, setItemToDelete] = useState<ScheduleItem | undefined>(undefined);
 
-  useEffect(() => {
-    let mounted = true;
+  // 3. Handle Save (Create/Update)
+  const handleSaveItem = async (data: LessonFormData, isRecurring: boolean) => {
+    // data contains: subject, room, start_time, end_time, type, color, date (if provided), id (if edit)
 
-    fetchAllLessonsFromDb().then((data) => {
-      if (mounted) {
-        setAllLessons(data);
-        setLoading(false);
-      }
-    });
+    const commonFields = {
+        subject: data.subject,
+        room: data.room,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        type: data.type,
+        color: data.color,
+    };
 
-    return () => { mounted = false; };
-  }, []);
+    if (data.id && editingItem) {
+        // Update existing
+        const wasRecurring = !('date' in editingItem);
+        const wasOneTime = 'date' in editingItem;
 
-  const refreshLessons = async () => {
-    const data = await fetchAllLessonsFromDb();
-    setAllLessons(data);
-  };
+        if (wasRecurring && isRecurring) {
+             // Update Lesson
+             const { error } = await supabase
+                .from('lessons')
+                .update({ ...commonFields, day_of_week: currentDate.getDay() })
+                .eq('id', data.id);
+             if (error) console.error('Error updating lesson:', error);
+        } else if (wasOneTime && !isRecurring) {
+             // Update Event
+             const { error } = await supabase
+                .from('events')
+                .update({ ...commonFields, date: data.date })
+                .eq('id', data.id);
+             if (error) console.error('Error updating event:', error);
+        } else {
+             // Type changed (Recurring <-> One-time)
+             // Delete old, create new.
+             if (wasRecurring) {
+                 await supabase.from('lessons').delete().eq('id', data.id);
+                 const { error } = await supabase.from('events').insert([{ ...commonFields, date: data.date }]);
+                 if (error) console.error('Error creating event (converted):', error);
+             } else {
+                 await supabase.from('events').delete().eq('id', data.id);
+                 const { error } = await supabase.from('lessons').insert([{ ...commonFields, day_of_week: currentDate.getDay() }]);
+                 if (error) console.error('Error creating lesson (converted):', error);
+             }
+        }
 
-  const handleSaveLesson = async (lessonData: Omit<Lesson, 'id'> | Lesson) => {
-    if ('id' in lessonData) {
-      // Update
-      const { error } = await supabase
-        .from('lessons')
-        .update({
-          subject: lessonData.subject,
-          room: lessonData.room,
-          start_time: lessonData.start_time,
-          end_time: lessonData.end_time,
-          day_of_week: lessonData.day_of_week,
-          type: lessonData.type,
-          color: lessonData.color,
-        })
-        .eq('id', lessonData.id);
-
-      if (error) console.error('Error updating lesson:', error);
     } else {
-      // Create
-      const { error } = await supabase
-        .from('lessons')
-        .insert([lessonData]);
-
-      if (error) console.error('Error creating lesson:', error);
+        // Create New
+        if (isRecurring) {
+             const { error } = await supabase
+                .from('lessons')
+                .insert([{ ...commonFields, day_of_week: currentDate.getDay() }]);
+             if (error) console.error('Error creating lesson:', error);
+        } else {
+             const { error } = await supabase
+                .from('events')
+                .insert([{ ...commonFields, date: data.date }]);
+             if (error) console.error('Error creating event:', error);
+        }
     }
 
-    await refreshLessons();
-    setEditingLesson(undefined);
+    await refreshSchedule();
+    setEditingItem(undefined);
   };
 
-  const handleDeleteLesson = async () => {
-    if (!lessonToDelete) return;
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
 
-    const { error } = await supabase
-      .from('lessons')
-      .delete()
-      .eq('id', lessonToDelete.id);
-
-    if (error) {
-      console.error('Error deleting lesson:', error);
+    if ('date' in itemToDelete) {
+        // Event
+        const { error } = await supabase.from('events').delete().eq('id', itemToDelete.id);
+        if (error) console.error('Error deleting event:', error);
     } else {
-      await refreshLessons();
+        // Lesson
+        const { error } = await supabase.from('lessons').delete().eq('id', itemToDelete.id);
+        if (error) console.error('Error deleting lesson:', error);
     }
+
+    await refreshSchedule();
     setIsDeleteModalOpen(false);
-    setLessonToDelete(undefined);
+    setItemToDelete(undefined);
   };
 
   const openAddModal = () => {
-    setEditingLesson(undefined);
+    setEditingItem(undefined);
     setIsModalOpen(true);
   };
 
-  const openEditModal = (lesson: Lesson) => {
-    setEditingLesson(lesson);
+  const openEditModal = (item: ScheduleItem) => {
+    setEditingItem(item);
     setIsModalOpen(true);
   };
 
-  const openDeleteModal = (lesson: Lesson) => {
-    // When called from Timeline, the modal might be open.
-    // But usually we open delete confirmation from the edit modal or directly.
-    // In my design, I pass onDelete to LessonModal.
-    // So LessonModal calls this.
-    setLessonToDelete(lesson);
-    // We should close the edit modal if it's open, but let's just open the confirm modal.
-    // Actually, LessonModal closes itself before calling onDelete if I implemented it that way?
-    // In LessonModal: onClick={() => { onDelete(); onClose(); }}
-    // So LessonModal closes, then openDeleteModal is called.
+  const openDeleteModal = (item: ScheduleItem) => {
+    setItemToDelete(item);
     setIsDeleteModalOpen(true);
   };
-
-  // Filter lessons for current day
-  const lessonsForCurrentDay = allLessons.filter(l => l.day_of_week === currentDay);
 
   return (
     <div className="min-h-screen pb-20 pt-8 font-sans overflow-hidden">
@@ -152,17 +143,24 @@ function App() {
         </header>
 
         <div className="shrink-0 mb-4">
-          <DaySelector currentDay={currentDay} onSelectDay={setCurrentDay} />
+          <DaySelector currentDate={currentDate} onSelectDate={setCurrentDate} />
         </div>
 
+        {holiday && (
+            <div className="mx-4 mb-4 p-4 bg-gradient-to-r from-red-100 to-pink-100 border border-red-200 rounded-2xl shadow-sm text-center">
+                <p className="text-red-800 font-bold text-lg">🎉 Holiday: {holiday.name}</p>
+                <p className="text-red-600/80 text-sm">No classes today!</p>
+            </div>
+        )}
+
         <div className="px-2 flex-grow relative pb-4">
-          {loading && allLessons.length === 0 ? (
+          {loading ? (
             <div className="flex justify-center items-center h-60">
               <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
             </div>
           ) : (
             <TimelineGrid
-              lessons={lessonsForCurrentDay}
+              items={scheduleItems}
               onEdit={openEditModal}
             />
           )}
@@ -172,16 +170,16 @@ function App() {
       <LessonModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveLesson}
-        onDelete={editingLesson ? () => openDeleteModal(editingLesson) : undefined}
-        initialData={editingLesson}
-        day={currentDay}
+        onSave={handleSaveItem}
+        onDelete={editingItem ? () => openDeleteModal(editingItem) : undefined}
+        initialData={editingItem}
+        currentDate={currentDate}
       />
 
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleDeleteLesson}
+        onConfirm={handleDeleteItem}
       />
     </div>
   );

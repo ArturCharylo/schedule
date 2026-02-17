@@ -1,14 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Check, Trash2 } from 'lucide-react';
-import type { Lesson } from '../types';
+import { format } from 'date-fns';
+import { twMerge } from 'tailwind-merge';
+import type { ScheduleItem } from '../types';
+
+export interface LessonFormData {
+  id?: string;
+  subject: string;
+  room: string;
+  start_time: string;
+  end_time: string;
+  type: 'class' | 'event';
+  color: string;
+  date: string;
+}
 
 interface LessonModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (lesson: Omit<Lesson, 'id'> | Lesson) => void;
+  onSave: (data: LessonFormData, isRecurring: boolean) => void;
   onDelete?: () => void;
-  initialData?: Lesson;
-  day: number;
+  initialData?: ScheduleItem;
+  currentDate: Date;
 }
 
 const PRESET_COLORS = [
@@ -22,7 +35,7 @@ const PRESET_COLORS = [
   '#14B8A6', // Teal
 ];
 
-export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, day }: LessonModalProps) {
+export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, currentDate }: LessonModalProps) {
   const [subject, setSubject] = useState('');
   const [room, setRoom] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -30,43 +43,66 @@ export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, da
   const [type, setType] = useState<'class' | 'event'>('class');
   const [color, setColor] = useState(PRESET_COLORS[0]);
 
-  useEffect(() => {
-    if (initialData) {
-      setSubject(initialData.subject);
-      setRoom(initialData.room);
-      setStartTime(initialData.start_time);
-      setEndTime(initialData.end_time);
-      setType(initialData.type || 'class');
-      setColor(initialData.color || (initialData.type === 'event' ? '#10B981' : '#3B82F6'));
-    } else {
-      setSubject('');
-      setRoom('');
-      setStartTime('');
-      setEndTime('');
-      setType('class');
-      setColor(PRESET_COLORS[0]);
+  const [isRecurring, setIsRecurring] = useState(true);
+  const [date, setDate] = useState('');
+
+  // State for tracking props changes to reset form
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevInitialData, setPrevInitialData] = useState(initialData);
+  const [prevCurrentDate, setPrevCurrentDate] = useState(currentDate); // Track currentDate to update default date
+
+  if (isOpen !== prevIsOpen || initialData !== prevInitialData || (isOpen && !initialData && currentDate !== prevCurrentDate)) {
+    setPrevIsOpen(isOpen);
+    setPrevInitialData(initialData);
+    setPrevCurrentDate(currentDate);
+
+    if (isOpen) {
+        if (initialData) {
+            setSubject(initialData.subject);
+            setRoom(initialData.room);
+            setStartTime(initialData.start_time);
+            setEndTime(initialData.end_time);
+            setType(initialData.type || 'class');
+            setColor(initialData.color || (initialData.type === 'event' ? '#10B981' : '#3B82F6'));
+
+            if ('date' in initialData && initialData.date) {
+                setIsRecurring(false);
+                setDate(initialData.date);
+            } else {
+                setIsRecurring(true);
+                setDate(format(currentDate, 'yyyy-MM-dd'));
+            }
+        } else {
+            // New item
+            setSubject('');
+            setRoom('');
+            setStartTime('');
+            setEndTime('');
+            setType('class');
+            setColor(PRESET_COLORS[0]);
+            setIsRecurring(true);
+            setDate(format(currentDate, 'yyyy-MM-dd'));
+        }
     }
-  }, [initialData, isOpen]);
+  }
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const lessonData = {
+
+    const data: LessonFormData = {
+      id: initialData?.id,
       subject,
       room,
       start_time: startTime,
       end_time: endTime,
-      day_of_week: day,
       type,
       color,
+      date,
     };
 
-    if (initialData) {
-        onSave({ ...lessonData, id: initialData.id });
-    } else {
-        onSave(lessonData);
-    }
+    onSave(data, isRecurring);
     onClose();
   };
 
@@ -83,6 +119,30 @@ export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, da
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Recurring vs One-time Toggle */}
+          <div className="flex bg-gray-100/50 p-1 rounded-xl mb-4 backdrop-blur-sm">
+            <button
+              type="button"
+              className={twMerge(
+                  "flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer",
+                  isRecurring ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+              )}
+              onClick={() => setIsRecurring(true)}
+            >
+              Weekly
+            </button>
+            <button
+              type="button"
+              className={twMerge(
+                  "flex-1 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer",
+                  !isRecurring ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+              )}
+              onClick={() => setIsRecurring(false)}
+            >
+              One-time
+            </button>
+          </div>
 
           {/* Type Toggle */}
           <div className="flex bg-gray-100/50 p-1 rounded-xl mb-4 backdrop-blur-sm">
@@ -101,6 +161,20 @@ export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, da
               Personal
             </button>
           </div>
+
+           {/* Date Input (only if one-time) */}
+          {!isRecurring && (
+             <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1 ml-1">Date</label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl bg-white/50 border border-gray-200/60 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                />
+             </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1 ml-1">Title</label>
