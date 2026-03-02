@@ -62,7 +62,6 @@ Deno.serve(async () => {
     // Calculate Day of Week (0-6, where 0 is Sunday in JS, but usually 1-7 in our DB?)
     // Let's verify standard JS getDay(): 0=Sun, 1=Mon... 
     // Your App.tsx uses getDay(), so we use the same logic.
-    const now = new Date();
     // Trick: create date object from the Polish string components to get correct weekday
     // (creating "new Date()" directly uses server UTC time, which might be different day)
     const polishDateObj = new Date(`${todayDateString}T${hourStr}:${minuteStr}:00`);
@@ -159,13 +158,17 @@ Deno.serve(async () => {
       // Send to all subscribers
       const promises = (subscriptions || []).map(async (sub: Subscription) => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pushSubscription = sub.subscription_data as any;
           await webpush.sendNotification(
-            sub.subscription_data as any,
+            pushSubscription,
             payload
           );
           return { status: 'fulfilled' };
-        } catch (error: any) {
-          if (error.statusCode === 410 || error.statusCode === 404) {
+        } catch (error: unknown) {
+          // Narrow the type to access the potential statusCode
+          const err = error as { statusCode?: number };
+          if (err.statusCode === 410 || err.statusCode === 404) {
              await supabase.from('subscriptions').delete().eq('id', sub.id);
           }
           return { status: 'rejected' };
@@ -188,8 +191,9 @@ Deno.serve(async () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

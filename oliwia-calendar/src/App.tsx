@@ -14,6 +14,7 @@ import { HolidayModal } from './components/HolidayModal'; // Import new componen
 function App() {
   // 1. Current Date State
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
 
   // 2. Fetch Schedule Data
   const { scheduleItems, holiday, loading, refreshSchedule } = useSchedule(currentDate);
@@ -28,6 +29,8 @@ function App() {
   // 3. Handle Save (Create/Update)
   const handleSaveItem = async (data: LessonFormData, isRecurring: boolean) => {
     // Data contains: subject, room, start_time, end_time, type, color, date (if provided), id (if edit)
+
+    const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay();
 
     const commonFields = {
         subject: data.subject,
@@ -47,7 +50,7 @@ function App() {
              // 1. Lesson -> Lesson (Update)
              const { error } = await supabase
                 .from('lessons')
-                .update({ ...commonFields, day_of_week: currentDate.getDay() })
+                .update({ ...commonFields, day_of_week: dayOfWeek })
                 .eq('id', data.id);
              if (error) console.error('Error updating lesson:', error);
 
@@ -77,7 +80,7 @@ function App() {
                  // Converting Event to Lesson
                  const { error: insertError } = await supabase
                     .from('lessons')
-                    .insert([{ ...commonFields, day_of_week: currentDate.getDay() }]);
+                    .insert([{ ...commonFields, day_of_week: dayOfWeek }]);
                  
                  if (!insertError) {
                     await supabase.from('events').delete().eq('id', data.id);
@@ -93,7 +96,7 @@ function App() {
         if (isRecurring) {
              const { error } = await supabase
                 .from('lessons')
-                .insert([{ ...commonFields, day_of_week: currentDate.getDay() }]);
+                .insert([{ ...commonFields, day_of_week: dayOfWeek }]);
              if (error) console.error('Error creating lesson:', error);
         } else {
              const { error } = await supabase
@@ -140,6 +143,15 @@ function App() {
     setIsDeleteModalOpen(true);
   };
 
+  const handleSelectDate = (newDate: Date) => {
+    if (newDate > currentDate) {
+      setSlideDirection('right');
+    } else if (newDate < currentDate) {
+      setSlideDirection('left');
+    }
+    setCurrentDate(newDate);
+  };
+
   return (
     <div className="min-h-screen pb-20 pt-8 font-sans overflow-hidden">
       <div className="blob-bg" />
@@ -172,7 +184,7 @@ function App() {
         </header>
 
         <div className="shrink-0 mb-4">
-          <DaySelector currentDate={currentDate} onSelectDate={setCurrentDate} />
+          <DaySelector currentDate={currentDate} onSelectDate={handleSelectDate} />
         </div>
 
         {holiday && (
@@ -188,10 +200,17 @@ function App() {
               <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
             </div>
           ) : (
-            <TimelineGrid
-              items={scheduleItems}
-              onEdit={openEditModal}
-            />
+            <div className="overflow-x-hidden w-full relative">
+              <div
+                key={currentDate.toISOString()}
+                className={`animate-in fade-in duration-300 fill-mode-forwards ${slideDirection === 'right' ? 'slide-in-from-right-8' : 'slide-in-from-left-8'}`}
+              >
+                <TimelineGrid
+                  items={scheduleItems}
+                  onEdit={openEditModal}
+                />
+              </div>
+            </div>
           )}
         </div>
       </div>
