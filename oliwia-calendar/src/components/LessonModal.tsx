@@ -63,7 +63,7 @@ export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, cu
             setStartTime(initialData.start_time);
             setEndTime(initialData.end_time);
             setType(initialData.type || 'class');
-            setColor(initialData.color || (initialData.type === 'event' ? '#10B981' : '#3B82F6'));
+            setColor(initialData.color || PRESET_COLORS[0]);
 
             if ('date' in initialData && initialData.date) {
                 setIsRecurring(false);
