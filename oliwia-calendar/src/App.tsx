@@ -201,15 +201,12 @@ function App() {
             </div>
           ) : (
             <div className="overflow-x-hidden w-full relative">
-              <div
-                key={currentDate.toISOString()}
-                className={slideDirection === 'right' ? 'animate-slide-blur-right' : 'animate-slide-blur-left'}
-              >
-                <TimelineGrid
-                  items={scheduleItems}
-                  onEdit={openEditModal}
-                />
-              </div>
+              <TimelineGrid
+                items={scheduleItems}
+                onEdit={openEditModal}
+                slideDirection={slideDirection}
+                currentDate={currentDate}
+              />
             </div>
           )}
         </div>

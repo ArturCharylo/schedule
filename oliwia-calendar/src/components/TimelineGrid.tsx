@@ -6,13 +6,15 @@ import { TimelineEvent } from './TimelineEvent';
 interface TimelineGridProps {
   items: ScheduleItem[];
   onEdit: (item: ScheduleItem) => void;
+  slideDirection: 'left' | 'right';
+  currentDate: Date;
 }
 
 const START_HOUR = 7;
 const END_HOUR = 22;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
-export function TimelineGrid({ items, onEdit }: TimelineGridProps) {
+export function TimelineGrid({ items, onEdit, slideDirection, currentDate }: TimelineGridProps) {
   // Memoize layout calculation to avoid re-calculating on every render
   const layoutEvents = useMemo(() => calculateLayout(items), [items]);
 
@@ -44,7 +46,10 @@ export function TimelineGrid({ items, onEdit }: TimelineGridProps) {
           ))}
 
           {/* Events Container - Offset by time label width */}
-          <div className="absolute top-0 right-2 bottom-0 left-14">
+          <div
+            key={currentDate.toISOString()}
+            className={`absolute top-0 right-2 bottom-0 left-14 ${slideDirection === 'right' ? 'animate-slide-blur-right' : 'animate-slide-blur-left'}`}
+          >
              {layoutEvents.map((event) => (
                <TimelineEvent
                  key={event.id}
