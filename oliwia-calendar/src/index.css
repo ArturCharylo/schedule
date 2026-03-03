@@ -5,7 +5,6 @@
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -43,15 +42,15 @@ body {
   0% {
     transform: translateX(100%);
     opacity: 0;
-    filter: blur(8px);
+    filter: blur(4px);
   }
   50% {
     filter: blur(4px);
-    opacity: 0.8;
+    opacity: 0.3;
   }
   100% {
     transform: translateX(0);
-    opacity: 1;
+    opacity: 0.7;
     filter: blur(0px);
   }
 }
@@ -60,23 +59,23 @@ body {
   0% {
     transform: translateX(-100%);
     opacity: 0;
-    filter: blur(8px);
+    filter: blur(4px);
   }
   50% {
-    filter: blur(4px);
-    opacity: 0.8;
+    filter: blur(2px);
+    opacity: 0.3;
   }
   100% {
     transform: translateX(0);
-    opacity: 1;
+    opacity: 0.7;
     filter: blur(0px);
   }
 }
 
 .animate-slide-blur-right {
-  animation: slideBlurRight 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: slideBlurRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .animate-slide-blur-left {
-  animation: slideBlurLeft 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: slideBlurLeft 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
