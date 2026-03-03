@@ -26,11 +26,13 @@ export function DaySelector({ currentDate, onSelectDate }: DaySelectorProps) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const handlePrevWeek = () => {
-    setWeekStart((prev) => subWeeks(prev, 1));
+    const newDate = subWeeks(currentDate, 1);
+    onSelectDate(newDate);
   };
 
   const handleNextWeek = () => {
-    setWeekStart((prev) => addWeeks(prev, 1));
+    const newDate = addWeeks(currentDate, 1);
+    onSelectDate(newDate);
   };
 
   return (
