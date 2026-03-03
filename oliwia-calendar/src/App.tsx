@@ -203,7 +203,7 @@ function App() {
             <div className="overflow-x-hidden w-full relative">
               <div
                 key={currentDate.toISOString()}
-                className={`animate-in fade-in zoom-in-95 duration-300 ease-out fill-mode-forwards ${slideDirection === 'right' ? 'slide-in-from-right-full' : 'slide-in-from-left-full'}`}
+                className={slideDirection === 'right' ? 'animate-slide-blur-right' : 'animate-slide-blur-left'}
               >
                 <TimelineGrid
                   items={scheduleItems}
