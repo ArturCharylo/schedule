@@ -26,4 +26,10 @@ export interface Holiday {
   name: string;
 }
 
+export interface LessonException {
+  id: string;
+  lesson_id: string;
+  date: string; // YYYY-MM-DD
+}
+
 export type ScheduleItem = Lesson | CalendarEvent;

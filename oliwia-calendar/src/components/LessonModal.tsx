@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { X, Check, Trash2 } from 'lucide-react';
+import { X, Check, Trash2, CalendarX } from 'lucide-react';
 import { format } from 'date-fns';
 import { twMerge } from 'tailwind-merge';
+import { useQueryClient } from '@tanstack/react-query';
+import { addLessonException } from '../lib/api';
 import type { ScheduleItem } from '../types';
 
 export interface LessonFormData {
@@ -36,6 +38,7 @@ const PRESET_COLORS = [
 ];
 
 export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, currentDate }: LessonModalProps) {
+  const queryClient = useQueryClient();
   const [subject, setSubject] = useState('');
   const [room, setRoom] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -87,6 +90,18 @@ export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, cu
   }
 
   if (!isOpen) return null;
+
+  const handleCancelThisWeek = async () => {
+    if (!initialData || !initialData.id || !isRecurring) return;
+    try {
+      await addLessonException(initialData.id, format(currentDate, 'yyyy-MM-dd'));
+      await queryClient.invalidateQueries({ queryKey: ['lesson_exceptions'] });
+      onClose();
+    } catch (error) {
+      console.error('Failed to cancel lesson for this week:', error);
+      alert('Failed to cancel the lesson. Please try again.');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,23 +256,36 @@ export function LessonModal({ isOpen, onClose, onSave, onDelete, initialData, cu
             </div>
           </div>
 
-          <div className="flex gap-3 mt-4">
-            {initialData && onDelete && (
-                <button
-                    type="button"
-                    onClick={() => { onDelete(); onClose(); }}
-                    className="flex-none p-3.5 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors cursor-pointer active:scale-95 border border-red-100"
-                    title="Delete"
-                >
-                    <Trash2 className="w-5 h-5" />
-                </button>
+          <div className="flex flex-col gap-3 mt-4">
+            {initialData && isRecurring && !('date' in initialData) && (
+              <button
+                type="button"
+                onClick={handleCancelThisWeek}
+                className="w-full py-3 rounded-2xl bg-orange-50 text-orange-600 hover:bg-orange-100 font-medium transition-colors cursor-pointer active:scale-95 border border-orange-100 flex items-center justify-center gap-2"
+              >
+                <CalendarX className="w-4 h-4" />
+                Cancel this week
+              </button>
             )}
-            <button
-                type="submit"
-                className="flex-1 py-3.5 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold shadow-lg shadow-gray-300 transition-all active:scale-95 cursor-pointer"
-            >
-                Save
-            </button>
+
+            <div className="flex gap-3">
+              {initialData && onDelete && (
+                  <button
+                      type="button"
+                      onClick={() => { onDelete(); onClose(); }}
+                      className="flex-none p-3.5 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors cursor-pointer active:scale-95 border border-red-100"
+                      title="Delete"
+                  >
+                      <Trash2 className="w-5 h-5" />
+                  </button>
+              )}
+              <button
+                  type="submit"
+                  className="flex-1 py-3.5 rounded-2xl bg-gray-900 hover:bg-black text-white font-semibold shadow-lg shadow-gray-300 transition-all active:scale-95 cursor-pointer"
+              >
+                  Save
+              </button>
+            </div>
           </div>
         </form>
       </div>

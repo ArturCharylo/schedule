@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { fetchLessons, fetchEvents, fetchHolidays } from '../lib/api';
+import { fetchLessons, fetchEvents, fetchHolidays, fetchLessonExceptions } from '../lib/api';
 import type { ScheduleItem, Holiday, Lesson, CalendarEvent } from '../types';
 
 interface UseScheduleResult {
@@ -36,6 +36,12 @@ export function useSchedule(currentDate: Date): UseScheduleResult {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  const { data: allExceptions = [], isLoading: loadingExceptions } = useQuery({
+    queryKey: ['lesson_exceptions'],
+    queryFn: fetchLessonExceptions,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
   // Filter and compute derived state
   const { scheduleItems, holiday } = useMemo(() => {
     // 1. Find Holiday for today
@@ -47,7 +53,13 @@ export function useSchedule(currentDate: Date): UseScheduleResult {
     let lessons: Lesson[] = [];
     if (!currentHoliday) {
       // 3. Filter Lessons (Recurring) for today (if not holiday)
-      lessons = allLessons.filter(l => l.day_of_week === dayOfWeek);
+      lessons = allLessons.filter(l => {
+        // Only include if it matches day_of_week and isn't excepted for today
+        if (l.day_of_week !== dayOfWeek) return false;
+
+        const isExcepted = allExceptions.some(ex => ex.lesson_id === l.id && ex.date === dateStr);
+        return !isExcepted;
+      });
     }
 
     // Merge and Sort
@@ -56,15 +68,16 @@ export function useSchedule(currentDate: Date): UseScheduleResult {
     });
 
     return { scheduleItems: allItems, holiday: currentHoliday };
-  }, [dateStr, dayOfWeek, allHolidays, allEvents, allLessons]);
+  }, [dateStr, dayOfWeek, allHolidays, allEvents, allLessons, allExceptions]);
 
-  const loading = loadingLessons || loadingEvents || loadingHolidays;
+  const loading = loadingLessons || loadingEvents || loadingHolidays || loadingExceptions;
 
   const refreshSchedule = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['lessons'] }),
       queryClient.invalidateQueries({ queryKey: ['events'] }),
       queryClient.invalidateQueries({ queryKey: ['holidays'] }),
+      queryClient.invalidateQueries({ queryKey: ['lesson_exceptions'] }),
     ]);
   }, [queryClient]);
 
