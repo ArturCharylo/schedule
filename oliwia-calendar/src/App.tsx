@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Plus, Loader2, CalendarRange } from 'lucide-react'; // Added CalendarRange icon
+import { Plus, Loader2, CalendarRange, LogOut } from 'lucide-react'; // Added CalendarRange and LogOut icons
+import type { Session } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from './lib/supabase';
 import type { ScheduleItem } from './types';
 import { DaySelector } from './components/DaySelector';
@@ -11,9 +13,14 @@ import { NotificationManager } from './components/NotificationManager';
 import { useSchedule } from './hooks/useSchedule';
 import { HolidayModal } from './components/HolidayModal'; // Import new component
 
-function App() {
+interface AppProps {
+  session: Session;
+}
+
+function App({ session }: AppProps) {
   // 1. Current Date State
   const [currentDate, setCurrentDate] = useState(new Date());
+  const queryClient = useQueryClient();
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
 
   // 2. Fetch Schedule Data
@@ -152,6 +159,14 @@ function App() {
     setCurrentDate(newDate);
   };
 
+  const handleLogout = async () => {
+    // Clear the cache to prevent the next user from seeing the current user's data
+    queryClient.clear();
+    await supabase.auth.signOut();
+  };
+
+  const userDisplayName = session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'there';
+
   return (
     <div className="min-h-screen pb-20 pt-8 font-sans overflow-hidden">
       <div className="blob-bg" />
@@ -160,7 +175,7 @@ function App() {
         <header className="px-6 mb-6 flex justify-between items-center shrink-0">
           <div>
             <h1 className="text-3xl font-bold text-gray-900/80">Schedule</h1>
-            <p className="text-gray-500 font-medium">Have a great day, Oliwia! ❤️</p>
+            <p className="text-gray-500 font-medium">Have a great day, {userDisplayName}! ❤️</p>
           </div>
           <div className="flex gap-2">
             <NotificationManager />
@@ -179,6 +194,14 @@ function App() {
               className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
             >
               <Plus className="w-6 h-6 text-gray-800" />
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
+              title="Log Out"
+            >
+              <LogOut className="w-6 h-6 text-red-600" />
             </button>
           </div>
         </header>
