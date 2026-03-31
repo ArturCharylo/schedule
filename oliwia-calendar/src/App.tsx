@@ -262,6 +262,7 @@ function App({ session }: AppProps) {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         currentEmail={session.user.email || ''}
+        currentName={session.user.user_metadata?.first_name || ''}
         onLogout={handleLogout}
       />
     </div>
