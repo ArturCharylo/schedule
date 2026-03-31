@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Loader2, CalendarRange, LogOut } from 'lucide-react'; // Added CalendarRange and LogOut icons
+import { Plus, Loader2, CalendarRange, Settings } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from './lib/supabase';
@@ -11,7 +11,8 @@ import type { LessonFormData } from './components/LessonModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { NotificationManager } from './components/NotificationManager';
 import { useSchedule } from './hooks/useSchedule';
-import { HolidayModal } from './components/HolidayModal'; // Import new component
+import { HolidayModal } from './components/HolidayModal';
+import { SettingsModal } from './components/SettingsModal';
 
 interface AppProps {
   session: Session;
@@ -32,6 +33,7 @@ function App({ session }: AppProps) {
   const [editingItem, setEditingItem] = useState<ScheduleItem | undefined>(undefined);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<ScheduleItem | undefined>(undefined);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // 3. Handle Save (Create/Update)
   const handleSaveItem = async (data: LessonFormData, isRecurring: boolean) => {
@@ -197,11 +199,11 @@ function App({ session }: AppProps) {
             </button>
 
             <button
-              onClick={handleLogout}
+              onClick={() => setIsSettingsModalOpen(true)}
               className="p-3 bg-white/50 backdrop-blur-md rounded-full shadow-lg border border-white/40 active:scale-95 transition-transform cursor-pointer"
-              title="Log Out"
+              title="Settings"
             >
-              <LogOut className="w-6 h-6 text-red-600" />
+              <Settings className="w-6 h-6 text-gray-700" />
             </button>
           </div>
         </header>
@@ -254,6 +256,13 @@ function App({ session }: AppProps) {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteItem}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        currentEmail={session.user.email || ''}
+        onLogout={handleLogout}
       />
     </div>
   );
