@@ -29,8 +29,6 @@ export function Auth() {
           password,
         });
         if (error) throw error;
-        // Optionally notify the user to check their email if email confirmation is enabled
-        alert('Check your email for the login link or log in if confirmation is not required.');
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
