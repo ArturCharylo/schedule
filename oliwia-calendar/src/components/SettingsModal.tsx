@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Mail, Lock, Loader2, X, Settings } from 'lucide-react';
+import { Mail, Lock, Loader2, X, Settings, User } from 'lucide-react'; // Added 'User' icon
 import { supabase } from '../lib/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentEmail: string;
+  currentName: string; // New prop for current display name
   onLogout: () => void;
 }
 
-export function SettingsModal({ isOpen, onClose, currentEmail, onLogout }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, currentEmail, currentName, onLogout }: SettingsModalProps) {
   const [email, setEmail] = useState(currentEmail);
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState(currentName); // State for display name
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -24,17 +26,32 @@ export function SettingsModal({ isOpen, onClose, currentEmail, onLogout }: Setti
 
     try {
       // Prepare the update payload based on user input
-      const updates: { email?: string; password?: string } = {};
-      if (email !== currentEmail) updates.email = email;
-      if (password) updates.password = password;
+      // Added 'data' for storing user_metadata
+      const updates: { email?: string; password?: string; data?: { first_name: string } } = {};
+      
+      let hasChanges = false;
 
-      if (Object.keys(updates).length === 0) {
+      if (email !== currentEmail) {
+          updates.email = email;
+          hasChanges = true;
+      }
+      if (password) {
+          updates.password = password;
+          hasChanges = true;
+      }
+      if (displayName !== currentName) {
+          // Supabase saves custom fields in the 'data' JSONB object (user_metadata)
+          updates.data = { first_name: displayName };
+          hasChanges = true;
+      }
+
+      if (!hasChanges) {
         setMessage({ type: 'error', text: 'No changes to update.' });
         setLoading(false);
         return;
       }
 
-      // Call Supabase auth to update user credentials
+      // Call Supabase auth to update user credentials and metadata
       const { error } = await supabase.auth.updateUser(updates);
 
       if (error) throw error;
@@ -84,6 +101,26 @@ export function SettingsModal({ isOpen, onClose, currentEmail, onLogout }: Setti
             </div>
           )}
 
+          {/* Display Name Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 ml-1" htmlFor="settings-name">
+              Display Name
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                id="settings-name"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="block w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all shadow-sm outline-none text-gray-800"
+                placeholder="Enter your name"
+              />
+            </div>
+          </div>
+
           {/* Email Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 ml-1" htmlFor="settings-email">
@@ -123,22 +160,25 @@ export function SettingsModal({ isOpen, onClose, currentEmail, onLogout }: Setti
             </div>
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-md text-base font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all disabled:opacity-70 disabled:active:scale-100 mt-4 cursor-pointer"
-          >
-            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Save Changes'}
-          </button>
+          <div className="pt-2 flex flex-col gap-3">
+             {/* Submit Button */}
+             <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-md text-base font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all disabled:opacity-70 disabled:active:scale-100 cursor-pointer"
+             >
+                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Save Changes'}
+             </button>
 
-          <button
+             {/* Logout Button */}
+             <button
                 type="button"
                 onClick={onLogout}
                 className="w-full flex justify-center py-3 px-4 rounded-2xl text-base font-semibold text-red-600 bg-red-50 hover:bg-red-100 active:scale-[0.98] transition-all cursor-pointer"
-            >
+             >
                 Log Out
-            </button>
+             </button>
+          </div>
         </form>
       </div>
     </div>
