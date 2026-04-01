@@ -1,4 +1,4 @@
-project_id = "oliwia-calendar"
+project_id = "schedule"
 
 [functions.check-notifications]
 verify_jwt = false
