@@ -145,7 +145,7 @@ Deno.serve(async () => {
     // 7. Send Notifications
     const { data: subscriptions } = await supabase.from('subscriptions').select('*');
     const results = [];
-    const appUrl = 'https://oliwia-calendar.vercel.app'; // Your Vercel URL
+    const appUrl = 'https://schedule.vercel.app'; // Your Vercel URL
 
     for (const item of itemsToNotify) {
       const payload = JSON.stringify({
