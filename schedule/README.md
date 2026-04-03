@@ -1,73 +1,83 @@
-# React + TypeScript + Vite
+# Schedule
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A professional, multi-tenant scheduling application built with a modern web stack. It provides a sleek "iOS Native" Glassmorphism UI, allowing users to manage recurring lessons, one-time events, holidays, and exceptions. The application is designed to be fully multi-tenant, utilizing Supabase Row Level Security (RLS) for data isolation.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Multi-tenant Architecture:** Secure data isolation per user with Supabase Authentication and Row Level Security (RLS).
+- **Recurring Lessons:** Schedule weekly recurring lessons tied to specific days of the week.
+- **One-time Events:** Add specific, non-recurring events to the calendar.
+- **Holidays & Exceptions:** Define global holidays and specific exceptions (e.g., cancelling a single instance of a recurring lesson).
+- **Interactive Timeline View:** A visual timeline spanning from 07:00 to 22:00 with absolute positioning and overlap calculation logic.
+- **Modern UI/UX:** An elegant "iOS Native" and Glassmorphism design aesthetic featuring transparency, backdrop blurs, and rounded corners.
+- **Notifications:** Built-in notification system.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend Framework:** React 19, TypeScript, Vite
+- **Styling:** Tailwind CSS v4 (configured via Vite plugin), `clsx`, `tailwind-merge`
+- **Icons:** `lucide-react`
+- **Data Fetching & Caching:** `@tanstack/react-query` (with robust cache management for multi-tenant isolation)
+- **Date Manipulation:** `date-fns`
+- **Backend & Authentication:** Supabase (Database, Auth, RLS)
 
-## Expanding the ESLint configuration
+## Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Before running the project locally, make sure you have:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Node.js** (v18 or higher recommended)
+- **npm** or another package manager
+- **Supabase Account** and a Supabase project set up.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Installation & Setup
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd <repository-directory>/schedule
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+3. **Configure Environment Variables:**
+   Create a `.env.local` file in the `schedule` directory and add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=https://your-project-id.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   ```
+   *Note: Ensure your Supabase project is configured with the correct tables (`lessons`, `events`, `holidays`, `lesson_exceptions`) and RLS policies mapped to `auth.users(id)`.*
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+4. **Run the Development Server:**
+   ```bash
+   npm run dev
+   ```
+   The application will be available at `http://localhost:5173`.
+
+## How It Works
+
+### Architecture & Data Flow
+
+- **Database Schema:**
+  - `lessons`: Recurring items linked by `day_of_week`.
+  - `events`: One-time items linked by a specific `date`.
+  - `holidays`: Date-specific global exceptions.
+  - `lesson_exceptions`: Tracks specifically cancelled instances of recurring lessons.
+- **Security:** RLS policies on the Supabase backend ensure that records are only accessible to the authenticated user. A `user_id` column references `auth.users(id)`.
+- **Data Fetching:** The app retrieves all relevant records from Supabase via `src/lib/api.ts`. Client-side filtering and scheduling logic is executed in a custom hook (`useSchedule.ts`).
+- **Scheduling Logic:** The logic prioritizes filtering out `holidays` and `lesson_exceptions` (suppressing specific recurring instances), and then merges the remaining recurring `lessons` with one-time `events`.
+- **State Management & Caching:** `@tanstack/react-query` is used to cache data. On user logout, the query client cache is cleared (e.g., `queryClient.clear()`) to maintain multi-tenant data isolation.
+- **Rendering:** Core components render conditionally based on frontend session state (e.g., showing `<Auth />` vs `<App />`). The layout uses absolute positioning and custom overlap calculations defined in `src/lib/layout.ts` to display the vertical timeline view.
+
+## Scripts
+
+- `npm run dev`: Starts the Vite development server.
+- `npm run build`: Compiles TypeScript and builds the app for production.
+- `npm run lint`: Runs ESLint to check for code quality and style issues.
+- `npm run preview`: Previews the production build locally.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
