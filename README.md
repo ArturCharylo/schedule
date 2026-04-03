@@ -2,7 +2,7 @@
 
 A professional, multi-tenant scheduling application built with a modern web stack. Featuring a sleek "iOS Native" Glassmorphism UI, this application allows users to manage recurring lessons, one-time events, holidays, and exceptions intuitively.
 
-The project is hosted and deployed on [Vercel](https://schedule.vercel.app), providing a seamless, highly available experience out of the box.
+The project is hosted and deployed on [Vercel](https://oliwia-calendar.vercel.app), providing a seamless, highly available experience out of the box.
 
 ## Functionality
 
