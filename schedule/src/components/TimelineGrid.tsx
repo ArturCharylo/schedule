@@ -1,3 +1,4 @@
+// src/components/TimelineGrid.tsx
 import { useMemo, useState } from 'react';
 import type { ScheduleItem } from '../types';
 import { calculateLayout } from '../lib/layout';
@@ -16,16 +17,12 @@ const START_HOUR = 7;
 const END_HOUR = 22;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
-
 export function TimelineGrid({ items, onEdit, slideDirection, currentDate, onSwipeLeft, onSwipeRight }: TimelineGridProps) {
-  // Memoize layout calculation to avoid re-calculating on every render
   const layoutEvents = useMemo(() => calculateLayout(items), [items]);
-
-  // Total height in pixels (60px per hour) plus some padding at bottom
   const totalHeight = (END_HOUR - START_HOUR + 1) * 60 + 20;
 
   const [touchStart, setTouchStart] = useState<{ x: number, y: number } | null>(null);
-  const minSwipeDistance = 50; // Minimum distance in pixels to consider the movement as a swipe
+  const minSwipeDistance = 50;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart({
@@ -40,52 +37,47 @@ export function TimelineGrid({ items, onEdit, slideDirection, currentDate, onSwi
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
 
-    const distanceX = touchStart.x - touchEndX;
-    const distanceY = touchStart.y - touchEndY;
+    const dx = touchStart.x - touchEndX;
+    const dy = touchStart.y - touchEndY;
 
-    // Checking if the swipe is primarily horizontal and exceeds the minimum distance
-    if (Math.abs(distanceX) > Math.abs(distanceY) && Math.abs(distanceX) > minSwipeDistance) {
-      if (distanceX > 0) {
-        // Swipe left -> Next day
-        onSwipeLeft?.();
+    // Sprawdzamy czy ruch był poziomy i wystarczająco długi
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipeDistance) {
+      if (dx > 0) {
+        onSwipeLeft?.(); // Palec przesunięty w lewo
       } else {
-        // Swipe right -> Previous day
-        onSwipeRight?.();
+        onSwipeRight?.(); // Palec przesunięty w prawo
       }
     }
     setTouchStart(null);
   };
 
   return (
-    <div className="relative bg-white/60 backdrop-blur-2xl rounded-[32px] shadow-2xl overflow-hidden border border-white/60">
-      <div 
+    /* Handlery muszą być na kontenerze otaczającym treść */
+    <div 
+      className="relative bg-white/60 backdrop-blur-2xl rounded-[32px] shadow-2xl overflow-hidden border border-white/60 touch-pan-y"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="relative bg-white/60 backdrop-blur-2xl rounded-[32px] shadow-2xl overflow-hidden border border-white/60 touch-pan-y"
-    ></div>
+    >
       <div className="h-full overflow-y-auto no-scrollbar scroll-smooth pt-7" style={{ height: 'calc(100vh - 220px)', minHeight: '400px' }}>
         <div className="relative w-full" style={{ height: `${totalHeight}px` }}>
 
-          {/* Hour Markers & Grid Lines */}
+          {/* Linie siatki */}
           {HOURS.map((hour) => (
             <div
               key={hour}
               className="absolute w-full flex items-start"
               style={{ top: `${(hour - START_HOUR) * 60}px`, height: '60px' }}
             >
-              {/* Time Label */}
               <div className="w-14 flex-shrink-0 text-right pr-3 -mt-2.5 z-20 sticky left-0">
                 <span className="text-xs font-semibold text-gray-400">
                   {hour.toString().padStart(2, '0')}:00
                 </span>
               </div>
-
-              {/* Horizontal Line */}
               <div className="flex-grow border-t border-gray-200/50 w-full mt-0.5" />
             </div>
           ))}
 
-          {/* Events Container - Offset by time label width */}
+          {/* Kontener zdarzeń z animacją */}
           <div
             key={currentDate.toISOString()}
             className={`absolute top-0 right-2 bottom-0 left-14 ${slideDirection === 'right' ? 'animate-slide-blur-right' : 'animate-slide-blur-left'}`}
@@ -98,7 +90,6 @@ export function TimelineGrid({ items, onEdit, slideDirection, currentDate, onSwi
                />
              ))}
           </div>
-
         </div>
       </div>
     </div>
