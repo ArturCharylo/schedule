@@ -13,6 +13,7 @@ import { NotificationManager } from './components/NotificationManager';
 import { useSchedule } from './hooks/useSchedule';
 import { HolidayModal } from './components/HolidayModal';
 import { SettingsModal } from './components/SettingsModal';
+import { addDays, subDays } from 'date-fns';
 
 interface AppProps {
   session: Session;
@@ -161,6 +162,14 @@ function App({ session }: AppProps) {
     setCurrentDate(newDate);
   };
 
+  const handleNextDay = () => {
+    handleSelectDate(addDays(currentDate, 1));
+  };
+
+  const handlePrevDay = () => {
+    handleSelectDate(subDays(currentDate, 1));
+  }
+
   const handleLogout = async () => {
     // Clear the cache to prevent the next user from seeing the current user's data
     queryClient.clear();
@@ -231,6 +240,8 @@ function App({ session }: AppProps) {
                 onEdit={openEditModal}
                 slideDirection={slideDirection}
                 currentDate={currentDate}
+                onSwipeLeft={handlePrevDay}
+                onSwipeRight={handleNextDay}
               />
             </div>
           )}
