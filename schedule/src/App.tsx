@@ -240,8 +240,8 @@ function App({ session }: AppProps) {
                 onEdit={openEditModal}
                 slideDirection={slideDirection}
                 currentDate={currentDate}
-                onSwipeLeft={handlePrevDay}
-                onSwipeRight={handleNextDay}
+                onSwipeLeft={handleNextDay}
+                onSwipeRight={handlePrevDay}
               />
             </div>
           )}
